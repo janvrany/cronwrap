@@ -18,7 +18,6 @@ Example
 
 Basic example of usage::
 
-    ##Will print out help
     $ cronwrap -h
 
         usage: cronwrap [-h] [-c CMD] [-e EMAILS] [-t TIME] [-k] [-r] [-v]
@@ -47,20 +46,20 @@ Basic example of usage::
           -v, --verbose         Will send an email / print to stdout on successful
                                 run.
 
-    ##Will send out a timeout alert to cron@my_domain.com:
+    Send out a timeout alert to cron@my_domain.com:
     $ cronwrap -c "sleep 2" -t "1s" -e cron@my_domain.com
     
-    ##Will send out a timeout alert to cron@my_domain.com and kill the command:
+    Send out a timeout alert to cron@my_domain.com and kill the command:
     $ cronwrap -c "sleep 2" -t "1s" -k -e cron@my_domain.com
 
-    ##Will send out an error alert to cron@my_domain.com:
+    Send out an error alert to cron@my_domain.com:
     $ cronwrap -c "blah" -e cron@my_domain.com
     
-    ##Will retry a failed command continuously
+    Retry a failed command continuously
     $ cronwrap -c "blah" -r -e cron@my_domain.com
 
-    #Will not send any reports:
+    Don't send any reports:
     $ cronwrap -c "ls" -e cron@my_domain.com
 
-    #Will send a successful report to cron@my_domain.com:
+    Send a successful report to cron@my_domain.com:
     $ cronwrap -c "ls" -e cron@my_domain.com -v
