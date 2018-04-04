@@ -236,8 +236,8 @@ class Command:
            print cmd.run_time
     """
     def __init__(self, command, q=None):
-        outfile = tempfile.mktemp()
-        errfile = tempfile.mktemp()
+        ofd, outfile = tempfile.mkstemp()
+        efd, errfile = tempfile.mkstemp()
 
         t_start = time.time()
 
@@ -258,7 +258,7 @@ def send_email(sys_args, emails, subject, message):
     """Sends an email via `mail`."""
     emails = emails.split(',')
 
-    err_report = tempfile.mktemp()
+    erd, err_report = tempfile.mkstemp()
     fp_err_report = open(err_report, "w")
     fp_err_report.write(message)
     fp_err_report.close()
