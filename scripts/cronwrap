@@ -60,23 +60,21 @@ def handle_args(sys_args):
         time_exceeded = False
         while t.isAlive():
 
-            if sys_args.verbose:
-                print "Command still running..."
+            print_str(sys_args, "Command still running...")
 
             if not time_exceeded and is_time_exceeded(sys_args, start_time):
                 time_exceeded = True
-                if sys_args.verbose:
-                    print "Time window exceeded!"
+                print_str(sys_args, "Time window exceeded!")
 
                 handle_time_exceeded(sys_args, start_time)
 
             time.sleep(1)
 
         if not t.isAlive():
-            if sys_args.verbose:
-                print "Command finished"
+            print_str(sys_args, "Command finished")
+
             cmd = q.get()
-            print cmd.run_time
+            print_str(sys_args, cmd.run_time)
 
         if cmd.returncode != 0:
             handle_error(sys_args, cmd)
@@ -102,7 +100,7 @@ def handle_success(sys_args, cmd):
                        % platform.node().capitalize(),
                        out_str)
         else:
-            print out_str
+            print_str(sys_args, out_str)
 
 
 def handle_timeout(sys_args, cmd):
@@ -120,7 +118,7 @@ def handle_timeout(sys_args, cmd):
                    % platform.node().capitalize(),
                    err_str)
     else:
-        print err_str
+        print_str(sys_args, err_str)
 
 
 def handle_time_exceeded(sys_args, start_time):
@@ -138,7 +136,7 @@ def handle_time_exceeded(sys_args, start_time):
                    % platform.node().capitalize(),
                    err_str)
     else:
-        print err_str
+        print_str(sys_args, err_str)
 
 
 def handle_error(sys_args, cmd):
@@ -156,7 +154,7 @@ def handle_error(sys_args, cmd):
                    % platform.node().capitalize(),
                    err_str)
     else:
-        print err_str
+        print_str(sys_args, err_str)
 
     sys.exit(-1)
 
@@ -273,12 +271,13 @@ def send_email(sys_args, emails, subject, message):
                            err_report)
                           )
 
-            if sys_args.verbose:
-                if cmd.returncode == 0:
-                    print 'Sent an email to %s' % email
-                else:
-                    print 'Could not send an email to %s' % email
-                    print trim_if_needed(cmd.stderr)
+            if cmd.returncode == 0:
+                print_str(sys_args, 'Sent an email to %s' % email)
+            else:
+                print_str(sys_args, 'Could not send an email to %s' % email)
+                print_str(sys_args, trim_if_needed(cmd.stderr))
+
+        print_str(sys_args, message)
     finally:
         os.remove(err_report)
 
@@ -307,6 +306,11 @@ def trim_if_needed(txt, max_length=10000):
         return '... START TRUNCATED...\n%s' % txt[-max_length:]
     else:
         return txt
+
+
+def print_str(sys_args, str):
+    if sys_args.verbose:
+        print '[%s] %s' % (datetime.utcnow().replace(microsecond=0), str)
 
 
 if __name__ == '__main__':
