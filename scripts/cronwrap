@@ -35,6 +35,8 @@ import argparse
 import tempfile
 import time
 import platform
+import threading
+from multiprocessing import Queue
 from datetime import datetime, timedelta
 
 
@@ -48,11 +50,36 @@ def handle_args(sys_args):
         sys_args.verbose = True
 
     if sys_args.cmd:
-        cmd = Command(sys_args.cmd)
+
+        start_time = time.time()
+
+        q = Queue()
+        t = threading.Thread(target=Command, args=(sys_args.cmd,q))
+        t.start()
+
+        time_exceeded = False
+        while t.isAlive():
+
+            if sys_args.verbose:
+                print "Command still running..."
+
+            if not time_exceeded and is_time_exceeded(sys_args, start_time):
+                time_exceeded = True
+                if sys_args.verbose:
+                    print "Time window exceeded!"
+
+                handle_time_exceeded(sys_args, start_time)
+
+            time.sleep(1)
+
+        if not t.isAlive():
+            if sys_args.verbose:
+                print "Command finished"
+            cmd = q.get()
+            print cmd.run_time
+
         if cmd.returncode != 0:
             handle_error(sys_args, cmd)
-        elif is_time_exceeded(sys_args, cmd):
-            handle_timeout(sys_args, cmd)
         else:
             handle_success(sys_args, cmd)
     elif sys_args.emails:
@@ -96,6 +123,24 @@ def handle_timeout(sys_args, cmd):
         print err_str
 
 
+def handle_time_exceeded(sys_args, start_time):
+    """Called if a command exceeds its running time."""
+    err_str = render_time_exceeded_template(
+        "CRONWRAP DETECTED A TIME WINDOW HAS BEEN EXCEEDED ON FOLLOWING COMMAND:",
+        sys_args,
+        start_time
+    )
+
+    if sys_args.emails:
+        send_email(sys_args,
+                   sys_args.emails,
+                   'Host %s: cronwrap detected a time window has been exceeded!'
+                   % platform.node().capitalize(),
+                   err_str)
+    else:
+        print err_str
+
+
 def handle_error(sys_args, cmd):
     """Called when a command did not finish successfully."""
     err_str = render_email_template(
@@ -115,6 +160,27 @@ def handle_error(sys_args, cmd):
 
     sys.exit(-1)
 
+def render_time_exceeded_template(title, sys_args, start_time):
+    run_time = int(time.time() - start_time)
+    result_str = []
+
+    result_str.append(title)
+    result_str.append('%s\n' % sys_args.cmd)
+
+    result_str.append('COMMAND STARTED:')
+    result_str.append('%s UTC\n' % (datetime.utcnow() -
+                                    timedelta(seconds=run_time)))
+
+    result_str.append('COMMAND HAS BEEN RUNNING FOR:')
+    hours = run_time / 60 / 60
+    if run_time < 60:
+        hours = 0
+    result_str.append('%d seconds (%.2f hours)\n' % (run_time, hours))
+
+    result_str.append("COMMAND'S TIMEOUT IS SET AT:")
+    result_str.append('%s\n' % sys_args.time)
+
+    return '\n'.join(result_str)
 
 def render_email_template(title, sys_args, cmd):
     result_str = []
@@ -171,7 +237,7 @@ class Command:
            print cmd.returncode
            print cmd.run_time
     """
-    def __init__(self, command):
+    def __init__(self, command, q=None):
         outfile = tempfile.mktemp()
         errfile = tempfile.mktemp()
 
@@ -185,6 +251,9 @@ class Command:
 
         os.remove(outfile)
         os.remove(errfile)
+
+        if not q is None:
+            q.put(self)
 
 
 def send_email(sys_args, emails, subject, message):
@@ -214,10 +283,10 @@ def send_email(sys_args, emails, subject, message):
         os.remove(err_report)
 
 
-def is_time_exceeded(sys_args, cmd):
+def is_time_exceeded(sys_args, start_time):
     """Returns `True` if the command's run time has exceeded the maximum
     run time specified in command arguments. Else `False  is returned."""
-    cmd_time = int(cmd.run_time)
+    cmd_time = int(time.time() - start_time)
 
     #Parse sys_args.time
     max_time = sys_args.time
