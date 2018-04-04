@@ -35,8 +35,8 @@ import argparse
 import tempfile
 import time
 import platform
+import subprocess
 import threading
-from multiprocessing import Queue
 from datetime import datetime, timedelta
 
 
@@ -51,30 +51,25 @@ def handle_args(sys_args):
 
     if sys_args.cmd:
 
-        start_time = time.time()
-
-        q = Queue()
-        t = threading.Thread(target=Command, args=(sys_args.cmd,q))
-        t.start()
+        cmd = Command(sys_args.cmd)
 
         time_exceeded = False
-        while t.isAlive():
-
+        while cmd.is_running():
             print_str(sys_args, "Command still running...")
 
-            if not time_exceeded and is_time_exceeded(sys_args, start_time):
+            if sys_args.time and not time_exceeded and is_time_exceeded(sys_args, cmd.start_time):
                 time_exceeded = True
                 print_str(sys_args, "Time window exceeded!")
 
-                handle_time_exceeded(sys_args, start_time)
+                handle_time_exceeded(sys_args, cmd.start_time)
+
+                if sys_args.kill:
+                    kill_process(sys_args, cmd)
 
             time.sleep(1)
 
-        if not t.isAlive():
-            print_str(sys_args, "Command finished")
-
-            cmd = q.get()
-            print_str(sys_args, cmd.run_time)
+        if not cmd.is_running():
+            print_str(sys_args, "Command finished, Run time (sec): %s" % cmd.run_time)
 
         if cmd.returncode != 0:
             handle_error(sys_args, cmd)
@@ -156,7 +151,12 @@ def handle_error(sys_args, cmd):
     else:
         print_str(sys_args, err_str)
 
-    sys.exit(-1)
+    if sys_args.retry:
+        print_str(sys_args, "Failure detected, retrying...")
+        handle_args(sys_args)
+    else:
+        sys.exit(-1)
+
 
 def render_time_exceeded_template(title, sys_args, start_time):
     run_time = int(time.time() - start_time)
@@ -179,6 +179,7 @@ def render_time_exceeded_template(title, sys_args, start_time):
     result_str.append('%s\n' % sys_args.time)
 
     return '\n'.join(result_str)
+
 
 def render_email_template(title, sys_args, cmd):
     result_str = []
@@ -235,23 +236,25 @@ class Command:
            print cmd.returncode
            print cmd.run_time
     """
-    def __init__(self, command, q=None):
-        ofd, outfile = tempfile.mkstemp()
-        efd, errfile = tempfile.mkstemp()
+    def __init__(self, command):
+        self.command = command
+        self.returncode = 0
+        self.start_time = time.time()
+        self.process = subprocess.Popen(self.command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
+        t = threading.Thread(target=self.monitor_process)
+        t.start()
 
-        t_start = time.time()
+    def monitor_process(self):
+        while self.is_running():
+            time.sleep(.1)
 
-        self.returncode = os.system("( %s ) > %s 2> %s" %
-                                    (command, outfile, errfile)) >> 8
-        self.run_time = time.time() - t_start
-        self.stdout = open(outfile, "r").read().strip()
-        self.stderr = open(errfile, "r").read().strip()
+        self.returncode = self.process.returncode
+        self.stderr = self.process.stderr.read()
+        self.stdout = self.process.stdout.read()
+        self.run_time = int(time.time() - self.start_time)
 
-        os.remove(outfile)
-        os.remove(errfile)
-
-        if not q is None:
-            q.put(self)
+    def is_running(self):
+        return self.process is not None and self.process.poll() is None
 
 
 def send_email(sys_args, emails, subject, message):
@@ -308,6 +311,16 @@ def trim_if_needed(txt, max_length=10000):
         return txt
 
 
+def kill_process(sys_args, cmd):
+    print_str(sys_args, "Killing pid %s" % cmd.process.pid)
+
+    if cmd is not None and cmd.process is not None:
+        try:
+            cmd.process.kill()
+        except:
+            print_str(sys_args, "Error attempting to kill pid %s" % cmd.process.pid)
+
+
 def print_str(sys_args, str):
     if sys_args.verbose:
         print '[%s] %s' % (datetime.utcnow().replace(microsecond=0), str)
@@ -331,8 +344,15 @@ if __name__ == '__main__':
                         "Possible values include: `-t 2h`,`-t 2m`, `-t 30s`."
                         )
 
-    parser.add_argument('-v', '--verbose',
-                        nargs='?', default=False,
+    parser.add_argument('-k', '--kill', default=False, action='store_true',
+                        help='Will kill the process if the maximum running time is exceeded. '
+                        'This argument will only apply when the -t (or --time) argument is set.'
+                        )
+
+    parser.add_argument('-r', '--retry', default=False, action='store_true',
+                        help='Retry when the command errors out.')
+
+    parser.add_argument('-v', '--verbose', default=False, action='store_true',
                         help='Will send an email / print to stdout on successful run.')
 
     handle_args(parser.parse_args())
