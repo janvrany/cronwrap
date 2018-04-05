@@ -43,9 +43,6 @@ from datetime import datetime, timedelta
 #--- Handlers ----------------------------------------------
 def handle_args(sys_args):
     """Handles comamnds that are parsed via argparse."""
-    if not sys_args.time:
-        sys_args.time = '1h'
-
     if sys_args.verbose is not False:
         sys_args.verbose = True
 
@@ -57,7 +54,7 @@ def handle_args(sys_args):
         while cmd.is_running():
             print_str(sys_args, "Command still running...")
 
-            if sys_args.time and not time_exceeded and is_time_exceeded(sys_args, cmd.start_time):
+            if sys_args.time is not None and not time_exceeded and is_time_exceeded(sys_args, cmd.start_time):
                 time_exceeded = True
                 print_str(sys_args, "Time window exceeded!")
 
