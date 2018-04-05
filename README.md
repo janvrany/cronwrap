@@ -9,7 +9,7 @@ Installing
 
 To install cronwrap simply do::
 
-    $ sudo easy_install cronwrap
+    $ sudo setup.py install
     $ cronwrap -h
 
 
@@ -23,7 +23,7 @@ Basic example of usage::
         usage: cronwrap [-h] [-c CMD] [-e EMAILS] [-t TIME] [-k] [-r] [-v]
 
         A cron job wrapper that wraps jobs and enables better error reporting and
-        command timeouts. Version 1.3
+        command timeouts. Version 2.0
 
         optional arguments:
           -h, --help            show this help message and exit
