@@ -54,21 +54,30 @@ def handle_args(sys_args):
         while cmd.is_running():
             print_str(sys_args, "Command still running...")
 
-            if sys_args.time is not None and not time_exceeded and is_time_exceeded(sys_args, cmd.start_time):
+            # determine if we've exceeded the timeout (-t) value
+            if sys_args.time is not None and not time_exceeded and is_time_exceeded(sys_args.time, cmd.start_time):
                 time_exceeded = True
                 print_str(sys_args, "Time window exceeded!")
 
                 handle_time_exceeded(sys_args, cmd.start_time)
 
+                # kill the process if the kill (-k) argument is set
                 if sys_args.kill:
                     kill_process(sys_args, cmd)
+
+            # determine if we've exceeded the killtime (-kt) value
+            if sys_args.killtime is not None and is_time_exceeded(sys_args.killtime, cmd.start_time):
+                print_str(sys_args, "Kill-time window exceeded!")
+                kill_process(sys_args, cmd)
 
             time.sleep(1)
 
         if not cmd.is_running():
             print_str(sys_args, "Command finished, Run time (sec): %s" % cmd.run_time)
 
-        if cmd.returncode != 0:
+        if cmd.returncode == -9:
+            handle_kill(sys_args, cmd)
+        elif cmd.returncode != 0:
             handle_error(sys_args, cmd)
         else:
             handle_success(sys_args, cmd)
@@ -154,6 +163,29 @@ def handle_error(sys_args, cmd):
     else:
         sys.exit(-1)
 
+def handle_kill(sys_args, cmd):
+    """Called when a command did not finish successfully."""
+    err_str = render_email_template(
+        "CRONWRAP HAS KILLED A LONG-RUNNING COMMAND:",
+        sys_args,
+        cmd
+    )
+
+    if sys_args.emails:
+        send_email(sys_args,
+                   sys_args.emails,
+                   'Host %s: cronwrap killed a long-running command!!'
+                   % platform.node().capitalize(),
+                   err_str)
+    else:
+        print_str(sys_args, err_str)
+
+    if sys_args.retry:
+        print_str(sys_args, "Killed long-running command, retrying...")
+        handle_args(sys_args)
+    else:
+        sys.exit(-1)
+
 
 def render_time_exceeded_template(title, sys_args, start_time):
     run_time = int(time.time() - start_time)
@@ -199,6 +231,10 @@ def render_email_template(title, sys_args, cmd):
 
     result_str.append("COMMAND'S TIMEOUT IS SET AT:")
     result_str.append('%s\n' % sys_args.time)
+
+    if sys_args.killtime is not None:
+        result_str.append("COMMAND'S KILL TIMEOUT IS SET AT:")
+        result_str.append('%s\n' % sys_args.killtime)
 
     result_str.append('RETURN CODE WAS:')
     result_str.append('%s\n' % cmd.returncode)
@@ -282,13 +318,13 @@ def send_email(sys_args, emails, subject, message):
         os.remove(err_report)
 
 
-def is_time_exceeded(sys_args, start_time):
+def is_time_exceeded(timeout_time, start_time):
     """Returns `True` if the command's run time has exceeded the maximum
     run time specified in command arguments. Else `False  is returned."""
     cmd_time = int(time.time() - start_time)
 
     #Parse sys_args.time
-    max_time = sys_args.time
+    max_time = timeout_time
     sp = re.match("(\d+)([hms])", max_time).groups()
     t_val, t_unit = int(sp[0]), sp[1]
 
@@ -342,19 +378,24 @@ if __name__ == '__main__':
                         help='Set the maximum running time.'
                         'If this time is passed an alert email will be sent.'
                         "The command will keep running even if maximum running time is exceeded."
-                        "The default is 1 hour `-t 1h`. "
                         "Possible values include: `-t 2h`,`-t 2m`, `-t 30s`."
                         )
 
     parser.add_argument('-k', '--kill', default=False, action='store_true',
-                        help='Will kill the process if the maximum running time is exceeded. '
+                        help='Kill the process if the maximum running time is exceeded. '
                         'This argument will only apply when the -t (or --time) argument is set.'
+                        )
+
+    parser.add_argument('-kt', '--killtime',
+                        help='Kill the process when on a separate specified time limit. '
+                        'This argument is separate / standalone from the -t (--time) argument.'
+                        'Possible values include: `-kt 2h`,`-kt 2m`, `-kt 30s`.'
                         )
 
     parser.add_argument('-r', '--retry', default=False, action='store_true',
                         help='Retry when the command errors out.')
 
     parser.add_argument('-v', '--verbose', default=False, action='store_true',
-                        help='Will send an email / print to stdout on successful run.')
+                        help='Send an email / print to stdout on successful run.')
 
     handle_args(parser.parse_args())
