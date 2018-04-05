@@ -265,9 +265,8 @@ def send_email(sys_args, emails, subject, message):
 
     try:
         for email in emails:
-            cmd = Command('mail -s from=%s "%s" %s < %s' %
-                          (sys_args.fromemail,
-                           subject.replace('"', "'"),
+            cmd = Command('mail -s "%s" %s < %s' %
+                          (subject.replace('"', "'"),
                            email,
                            err_report)
                           )
@@ -329,11 +328,6 @@ def mail_to_default():
         return os.environ['MAILTO']
 
 
-def mail_from_default():
-    if 'MAILFROM' in os.environ:
-        return os.environ['MAILFROM']
-
-
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="A cron job wrapper that wraps jobs and enables better error reporting and command timeouts. Version %s" % __VERSION__)
 
@@ -343,9 +337,6 @@ if __name__ == '__main__':
                         help='Email following users if the command crashes or exceeds timeout. '
                         'Could be `cronwrap -e "johndoe@mail.com, marcy@mail.com"`. '
                         "Uses system's `mail` to send emails. If no command (cmd) is set a test email is sent.")
-
-    parser.add_argument('-f', '--fromemail', default=mail_from_default(),
-                        help='Email address used as the "from" address.')
 
     parser.add_argument('-t', '--time',
                         help='Set the maximum running time.'
