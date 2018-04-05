@@ -20,7 +20,8 @@ Basic example of usage::
 
     $ cronwrap -h
 
-        usage: cronwrap [-h] [-c CMD] [-e EMAILS] [-t TIME] [-k] [-r] [-v]
+        usage: cronwrap [-h] [-c CMD] [-e EMAILS] [-t TIME] [-k] [-kt KILLTIME] [-r]
+                [-v]
 
         A cron job wrapper that wraps jobs and enables better error reporting and
         command timeouts. Version 2.0
@@ -36,21 +37,28 @@ Basic example of usage::
                                 test email is sent.
           -t TIME, --time TIME  Set the maximum running time.If this time is passed an
                                 alert email will be sent.The command will keep running
-                                even if maximum running time is exceeded.The default
-                                is 1 hour `-t 1h`. Possible values include: `-t
-                                2h`,`-t 2m`, `-t 30s`.
-          -k, --kill            Will kill the process if the maximum running time is
+                                even if maximum running time is exceeded.Possible
+                                values include: `-t 2h`,`-t 2m`, `-t 30s`.
+          -k, --kill            Kill the process if the maximum running time is
                                 exceeded. This argument will only apply when the -t
                                 (or --time) argument is set.
+          -kt KILLTIME, --killtime KILLTIME
+                                Kill the process when on a separate specified time
+                                limit. This argument is separate / standalone from the
+                                -t (--time) argument.Possible values include: `-kt
+                                2h`,`-kt 2m`, `-kt 30s`.
           -r, --retry           Retry when the command errors out.
-          -v, --verbose         Will send an email / print to stdout on successful
-                                run.
+          -v, --verbose         Send an email / print to stdout on successful run.
+
 
     Send out a timeout alert to cron@my_domain.com:
     $ cronwrap -c "sleep 2" -t "1s" -e cron@my_domain.com
     
     Send out a timeout alert to cron@my_domain.com and kill the command:
     $ cronwrap -c "sleep 2" -t "1s" -k -e cron@my_domain.com
+    
+    Send out a timeout alert to cron@my_domain.com and kill the command at a different time:
+    $ cronwrap -c "sleep 10" -t "2s" -kt "5s" -e cron@my_domain.com
 
     Send out an error alert to cron@my_domain.com:
     $ cronwrap -c "blah" -e cron@my_domain.com
