@@ -70,8 +70,6 @@ def handle_args(sys_args):
                 print_str(sys_args, "Kill-time window exceeded!")
                 kill_process(sys_args, cmd)
 
-            time.sleep(1)
-
         if not cmd.is_running():
             print_str(sys_args, "Command finished, Run time (sec): %s" % cmd.run_time)
 
@@ -287,6 +285,7 @@ class Command:
         self.run_time = int(time.time() - self.start_time)
 
     def is_running(self):
+        time.sleep(1)
         return self.process is not None and self.process.poll() is None
 
 
