@@ -13,7 +13,7 @@ if sys.version_info < (2, 7):
     install_requires.append('argparse>=1.1')
 
 setup(name='cronwrap',
-      version = '2.0',
+      version = '2.0.1',
       author="amix the lucky stiff",
       author_email="amix@amix.dk",
       url="http://www.amix.dk/",
