@@ -339,7 +339,7 @@ def kill_process(sys_args, cmd):
 
 def print_str(sys_args, str):
     if sys_args.verbose:
-        print '[%s] %s' % (datetime.utcnow().replace(microsecond=0), str)
+        print('[%s] %s' % (datetime.utcnow().replace(microsecond=0), str))
 
 
 def mail_to_default():
